@@ -1,9 +1,14 @@
 pipeline {
     agent any
 
+    environment {
+        IMAGE = "salimhz/student-management"
+        TAG = "1.0.0"
+    }
+
     stages {
 
-        stage('Clone from GitHub') {
+        stage('Checkout') {
             steps {
                 git branch: 'main',
                     url: 'https://github.com/salim127/salim_hizi_4twin8.git'
@@ -12,8 +17,37 @@ pipeline {
 
         stage('Build Maven Project') {
             steps {
-                sh 'mvn compile'
+                sh "mvn clean package -DskipTests"
             }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                sh "docker build -t ${IMAGE}:${TAG} ."
+            }
+        }
+
+        stage('Docker Login') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
+                    sh "echo $PASS | docker login -u $USER --password-stdin"
+                }
+            }
+        }
+
+        stage('Push to Docker Hub') {
+            steps {
+                sh "docker push ${IMAGE}:${TAG}"
+            }
+        }
+    }
+
+    post {
+        success {
+            echo '🎉 SUCCESS : Docker image built & pushed successfully !'
+        }
+        failure {
+            echo '❌ FAILURE : Something went wrong.'
         }
     }
 }
